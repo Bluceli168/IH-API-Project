@@ -36,7 +36,7 @@ def get_selected_columns(column_dict: dict) -> list:
 
 def get_new_names(column_dict: dict) -> dict:
 
-    new_names = {infos['original_name']: new for new, infos in column_dict.items()}
+    new_names = {infos['original_name']                 : new for new, infos in column_dict.items()}
     return new_names
 
 
@@ -115,10 +115,10 @@ def get_given_names(year: int, field: str, count: int) -> dict:
     params = {
         'query': field,
         'filter': f'type:journal-article,from-pub-date:{year}-01-01,until-pub-date:{year}-12-31',
-        'sample': '50'
+        'sample': '75'
     }
 
-    response = requests.get(url, params=params, headers=headers, timeout=10)
+    response = requests.get(url, params=params, headers=headers,)
     response.raise_for_status()
 
     # Handle rate limiting based on headers
@@ -133,7 +133,7 @@ def get_given_names(year: int, field: str, count: int) -> dict:
     data = response.json()
     items = data['message']['items']
 
-    given_names = []
+    given_names = set()
     for item in items:
         authors = item.get('author', [])
         if authors:
@@ -141,21 +141,35 @@ def get_given_names(year: int, field: str, count: int) -> dict:
                 given = author.get('given', '')
 
                 if len(given) > 1 and not any(char in ['.', ' ', '&'] for char in given):
-                    given_names.append(given)
+                    given_names.add(given.strip())
 
                 if len(given_names) >= count:
-                    return given_names
-    authors = {'year': year, 'field': field, 'authors': given_names}
+                    break
+        if len(given_names) >= count:
+            break
+
+    authors = {'year': year, 'field': field, 'authors': list(given_names)}
+    print(authors)
     return authors
 
 
 def get_all_names_df(dictionary, starting_year) -> pd.DataFrame:
-    all_names = []
+    """
+    Retrieves given names from journal articles for each year and field specified in the dictionary.
 
-    for year in range(starting_year, time.localtime().tm_year - 1):
+    Args:
+        dictionary (dict): A dictionary containing fields and their categories.
+        starting_year (int): The starting year for fetching names.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing the given names.
+    """
+    all_names = pd.DataFrame()
+
+    for year in range(starting_year, time.localtime().tm_year):
         for field in dictionary['field']['categories']:
             names = get_given_names(year, field, 10)
-            all_names.append(names)
+            all_names = pd.concat(
+                [all_names, pd.DataFrame(names)], ignore_index=True)
 
-    all_names_df = pd.DataFrame(all_names)
-    return all_names_df
+    return all_names
