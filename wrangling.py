@@ -36,7 +36,7 @@ def get_selected_columns(column_dict: dict) -> list:
 
 def get_new_names(column_dict: dict) -> dict:
 
-    new_names = {infos['original_name']                 : new for new, infos in column_dict.items()}
+    new_names = {infos['original_name']: new for new, infos in column_dict.items()}
     return new_names
 
 
@@ -168,8 +168,14 @@ def get_all_names_df(dictionary, starting_year) -> pd.DataFrame:
 
     for year in range(starting_year, time.localtime().tm_year):
         for field in dictionary['field']['categories']:
-            names = get_given_names(year, field, 10)
-            all_names = pd.concat(
-                [all_names, pd.DataFrame(names)], ignore_index=True)
+
+            try:
+                names = get_given_names(year, field, 10)
+                all_names = pd.concat(
+                    [all_names, pd.DataFrame(names)], ignore_index=True)
+
+            except Exception as e:
+                print(f"An error occurred for year {
+                      year} and field {field}: {e}")
 
     return all_names
