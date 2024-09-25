@@ -1,5 +1,6 @@
 import requests
 import pandas as pd
+import json
 
 
 def flatten(dictionnary, prefix=''):
@@ -17,7 +18,7 @@ def flatten(dictionnary, prefix=''):
                 lambda x: len(x) if isinstance(x, list) else 0).max()
             for i in range(max_len):
                 inner_dict = flattened[column].apply(
-                    lambda x: x[i] if isinstance(x, list) and len(x) > i else None)
+                    lambda x, index=i: x[index] if isinstance(x, list) and len(x) > index else None)
                 flattened = pd.concat(
                     [flattened, flatten(inner_dict, f"{column}_{i+1}")], axis=1)
             flattened.drop(column, axis=1, inplace=True)
@@ -56,8 +57,7 @@ def get_selected_columns(column_dict: dict) -> list:
 
 def get_new_names(column_dict: dict) -> dict:
 
-    new_names = {infos['original_name']
-        : new for new, infos in column_dict.items()}
+    new_names = {infos['original_name']                 : new for new, infos in column_dict.items()}
     return new_names
 
 
@@ -77,3 +77,29 @@ def shape_dataframe(df: pd.DataFrame, dictionnary: dict) -> pd.DataFrame:
     df = filter_categories(df, dictionnary)
 
     return df
+
+
+def get_json(json_filename):
+    """
+    Reads a JSON file and returns its contents as a dictionary.
+
+    Args:
+        json_filename (str): The name of the JSON file (without the .json extension).
+
+    Returns:
+        dict: The contents of the JSON file.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+        json.JSONDecodeError: If the file is not a valid JSON.
+    """
+    try:
+        with open(json_filename + ".json", "r", encoding="utf-8") as json_file:
+            data = json.load(json_file)
+        return data
+    except FileNotFoundError:
+        print(f"Error: The file {json_filename}.json does not exist.")
+        raise
+    except json.JSONDecodeError:
+        print(f"Error: The file {json_filename}.json is not a valid JSON.")
+        raise
