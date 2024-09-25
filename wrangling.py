@@ -30,10 +30,9 @@ def get_all_laureates(url):
     limit = 25
     max_offset = 50
     all_laureates = pd.DataFrame()
-
     while offset < max_offset:
-        url = f"{url}?offset={offset}&limit={limit}"
-        response = requests.get(url, timeout=10)
+        final_url = f"{url}?offset={offset}&limit={limit}"
+        response = requests.get(final_url, timeout=10)
         data = response.json()
         max_offset = data['meta']['count']
         flattened = flatten(data['laureates'])
@@ -42,14 +41,16 @@ def get_all_laureates(url):
         offset += limit
 
     all_laureates['id'] = all_laureates['id'].astype(int)
-    return all_laureates.sort_values('id')
+    all_laureates = all_laureates.reset_index(drop=True)
+    all_laureates = all_laureates.sort_values('id')
+
+    return all_laureates
 
 
 def get_selected_columns(column_dict: dict) -> list:
 
     selected_columns = [infos['original_name']
                         for key, infos in column_dict.items()]
-    print('selected columns :\n', selected_columns)
     return selected_columns
 
 
@@ -57,7 +58,6 @@ def get_new_names(column_dict: dict) -> dict:
 
     new_names = {infos['original_name']
         : new for new, infos in column_dict.items()}
-    print('new column names :\n', new_names)
     return new_names
 
 
