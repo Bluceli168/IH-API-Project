@@ -2,6 +2,7 @@ import requests
 import pandas as pd
 import json
 import time
+import os
 
 
 def flatten(dictionnary, prefix=''):
@@ -36,7 +37,7 @@ def get_selected_columns(column_dict: dict) -> list:
 
 def get_new_names(column_dict: dict) -> dict:
 
-    new_names = {infos['original_name']: new for new, infos in column_dict.items()}
+    new_names = {infos['original_name']                 : new for new, infos in column_dict.items()}
     return new_names
 
 
@@ -148,7 +149,7 @@ def get_given_names(year: int, field: str, count: int) -> dict:
         if len(given_names) >= count:
             break
 
-    authors = {'year': year, 'field': field, 'authors': list(given_names)}
+    authors = {'year': year, 'field': field, 'name': list(given_names)}
     print(authors)
     return authors
 
@@ -178,4 +179,20 @@ def get_all_names_df(dictionary, starting_year) -> pd.DataFrame:
                 print(f"An error occurred for year {
                       year} and field {field}: {e}")
 
+    all_names['gender'] = None
     return all_names
+
+
+def get_papers_authors(dictionary, starting_year=1901, ending_year=2023,  file_suffix='initial'):
+    # It takes about 30 minutes to get all the research papers authors, the first run was saved to a csv file and will be used in the future as freshness has no impact on the analysis
+    df = pd.DataFrame()
+
+    if os.path.exists(f'sources/names_{file_suffix}.csv'):
+        df = pd.read_csv(f'sources/names_{file_suffix}.csv')
+
+    else:
+        df = get_all_names_df(dictionary, 1901)
+        filename = f'sources/names_{file_suffix}.csv'
+        df.to_csv(filename, index=False)
+
+    return df
