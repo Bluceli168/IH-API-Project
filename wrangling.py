@@ -37,7 +37,7 @@ def get_selected_columns(column_dict: dict) -> list:
 
 def get_new_names(column_dict: dict) -> dict:
 
-    new_names = {infos['original_name']: new for new, infos in column_dict.items()}
+    new_names = {infos['original_name']                 : new for new, infos in column_dict.items()}
     return new_names
 
 
@@ -109,7 +109,9 @@ def get_all_laureates(url):
 
 
 def get_given_names(year: int, field: str, count: int) -> dict:
+
     url = 'https://api.crossref.org/works'
+
     headers = {
         'User-Agent': 'RandomPhysicsPaperFetcher/1.0 (mailto:jipijipijipi@gmail.com)'
     }
@@ -119,7 +121,7 @@ def get_given_names(year: int, field: str, count: int) -> dict:
         'sample': '75'
     }
 
-    response = requests.get(url, params=params, headers=headers,)
+    response = requests.get(url, params=params, headers=headers, timeout=100)
     response.raise_for_status()
 
     # Handle rate limiting based on headers
@@ -154,7 +156,7 @@ def get_given_names(year: int, field: str, count: int) -> dict:
     return authors
 
 
-def get_all_names_df(dictionary, starting_year) -> pd.DataFrame:
+def get_all_names_df(dictionary, starting_year, ending_year) -> pd.DataFrame:
     """
     Retrieves given names from journal articles for each year and field specified in the dictionary.
 
@@ -167,7 +169,7 @@ def get_all_names_df(dictionary, starting_year) -> pd.DataFrame:
     """
     all_names = pd.DataFrame()
 
-    for year in range(starting_year, time.localtime().tm_year):
+    for year in range(starting_year, ending_year + 1):
         for field in dictionary['field']['categories']:
 
             try:
@@ -175,7 +177,7 @@ def get_all_names_df(dictionary, starting_year) -> pd.DataFrame:
                 all_names = pd.concat(
                     [all_names, pd.DataFrame(names)], ignore_index=True)
 
-            except Exception as e:
+            except (requests.exceptions.RequestException, ValueError, KeyError) as e:
                 print(f"An error occurred for year {
                       year} and field {field}: {e}")
 
@@ -189,9 +191,9 @@ def get_papers_authors(dictionary, starting_year=1901, ending_year=2023,  file_s
 
     if os.path.exists(f'sources/names_{file_suffix}.csv'):
         df = pd.read_csv(f'sources/names_{file_suffix}.csv')
-
+        print('Loading from cached names db')
     else:
-        df = get_all_names_df(dictionary, 1901)
+        df = get_all_names_df(dictionary, starting_year, ending_year)
         filename = f'sources/names_{file_suffix}.csv'
         df.to_csv(filename, index=False)
 
@@ -205,4 +207,118 @@ def load_or_fetch_laureates(file_path, url):
     else:
         df = get_all_laureates(url)
         df.to_csv(file_path, index=False)
+    return df
+
+
+# clean and select the names+gender database
+def clean_name_gender_db(source_path='sources/name_gender_dataset.csv', target_path='sources/name_gender_database_clean.csv'):
+
+    try:
+        df = pd.read_csv(target_path)
+
+    except FileNotFoundError as e:
+
+        print(f"{e}")
+        df = pd.read_csv(f'{source_path}')
+        df = df.rename(lambda x: x.lower(), axis=1)
+        df = df[['name', 'gender']]
+        df['gender'] = df['gender'].apply(
+            lambda x: 'male' if x == 'M' else 'female' if x == 'F' else None)
+        df.to_csv(f'{target_path}', index=False)
+
+    return df
+
+
+# supplement the database with missing values from laureates
+def find_missing_values_in_db(db, list, column_name='name'):
+    missing_values = list[~list[column_name].str.lower().isin(
+        db[column_name].str.lower())]
+    return missing_values
+
+
+# call namsor API with the list
+
+def get_genders_from_name_api(name_list_df, token, limit=50) -> dict:
+
+    final_list = []
+    url = "https://v2.namsor.com/NamSorAPIv2/api2/json/genderBatch"
+
+    while len(name_list_df) > 0:
+
+        payload = {
+            "personalNames": [{"firstName": name} for name in name_list_df['name'][:limit]]
+        }
+
+        print(payload)
+
+        headers = {
+            "X-API-KEY": token,
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        }
+
+        response = requests.post(url, headers=headers, json=payload)
+        response = response.json()
+        final_list.extend(response["personalNames"])
+        name_list_df = name_list_df[limit:]
+        time.sleep(1)
+
+    return final_list
+
+
+def format_new_names(new_names):
+    new_names = pd.DataFrame(new_names)
+    new_names = new_names[['firstName', 'likelyGender']]
+    new_names = new_names.rename(
+        columns={'firstName': 'name', 'likelyGender': 'gender'})
+    return new_names
+
+# update the database with the new values
+
+
+def update_name_gender_db(db_df, new_names_gender_df):
+    db_df = pd.concat([db_df, new_names_gender_df], ignore_index=True)
+    db_df = db_df.drop_duplicates(subset='name', keep='first')
+    db_df.to_csv('sources/name_gender_database_clean.csv', index=False)
+    return db_df
+# update the authors names df with the new genders
+
+
+def update_gender_from_db(df: pd.DataFrame, db: pd.DataFrame):
+
+    db = db.drop_duplicates(subset='name', keep='first')
+
+    # Create a mapping from dfB's name to gender
+    gender_mapping = db.set_index('name')['gender']
+
+    # Fill missing genders in dfA using the mapping
+    df['gender'] = df['gender'].fillna(df['name'].map(gender_mapping))
+    return df
+
+
+def genderize_names(df: pd.DataFrame):
+    # get the unique names
+    unique_authors_names_df = pd.DataFrame(
+        df['name'].unique(), columns=['name'])
+
+    # get a clean database of name + gender
+    name_gender_db_df = clean_name_gender_db()
+
+    # find the missing names in the database
+    missing_names = find_missing_values_in_db(
+        name_gender_db_df, unique_authors_names_df)
+
+    if not missing_names.empty:
+        # call the API with the missing names
+        new_names = get_genders_from_name_api(
+            missing_names.head(5), name_token)
+        new_names_df = format_new_names(new_names)
+
+        # update the database with the missing names
+        name_gender_db_df = update_name_gender_db(
+            name_gender_db_df, new_names_df)
+
+    # update the authors names df with the new genders
+    authors_names_and_genders_df = update_gender_from_db(df, name_gender_db_df)
+
     return df
