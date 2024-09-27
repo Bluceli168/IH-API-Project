@@ -37,7 +37,8 @@ def get_selected_columns(column_dict: dict) -> list:
 
 def get_new_names(column_dict: dict) -> dict:
 
-    new_names = {infos['original_name']                 : new for new, infos in column_dict.items()}
+    new_names = {infos['original_name']
+        : new for new, infos in column_dict.items()}
     return new_names
 
 
@@ -230,8 +231,8 @@ def clean_name_gender_db(source_path='sources/name_gender_dataset.csv', target_p
 
 
 # supplement the database with missing values from laureates
-def find_missing_values_in_db(db, list, column_name='name'):
-    missing_values = list[~list[column_name].str.lower().isin(
+def find_missing_values_in_db(db, name_list, column_name='name'):
+    missing_values = name_list[~name_list[column_name].str.lower().isin(
         db[column_name].str.lower())]
     return missing_values
 
@@ -257,7 +258,8 @@ def get_genders_from_name_api(name_list_df, token, limit=50) -> dict:
             "Content-Type": "application/json"
         }
 
-        response = requests.post(url, headers=headers, json=payload)
+        response = requests.post(url, headers=headers,
+                                 json=payload, timeout=120)
         response = response.json()
         final_list.extend(response["personalNames"])
         name_list_df = name_list_df[limit:]
@@ -296,7 +298,7 @@ def update_gender_from_db(df: pd.DataFrame, db: pd.DataFrame):
     return df
 
 
-def genderize_names(df: pd.DataFrame):
+def genderize_names(df: pd.DataFrame, token: str) -> pd.DataFrame:
     # get the unique names
     unique_authors_names_df = pd.DataFrame(
         df['name'].unique(), columns=['name'])
@@ -311,7 +313,7 @@ def genderize_names(df: pd.DataFrame):
     if not missing_names.empty:
         # call the API with the missing names
         new_names = get_genders_from_name_api(
-            missing_names.head(5), name_token)
+            missing_names.head(5), token)
         new_names_df = format_new_names(new_names)
 
         # update the database with the missing names
@@ -319,6 +321,6 @@ def genderize_names(df: pd.DataFrame):
             name_gender_db_df, new_names_df)
 
     # update the authors names df with the new genders
-    authors_names_and_genders_df = update_gender_from_db(df, name_gender_db_df)
+    df = update_gender_from_db(df, name_gender_db_df)
 
     return df
