@@ -37,7 +37,7 @@ def get_selected_columns(column_dict: dict) -> list:
 
 def get_new_names(column_dict: dict) -> dict:
 
-    new_names = {infos['original_name']                 : new for new, infos in column_dict.items()}
+    new_names = {infos['original_name']: new for new, infos in column_dict.items()}
     return new_names
 
 
@@ -195,4 +195,14 @@ def get_papers_authors(dictionary, starting_year=1901, ending_year=2023,  file_s
         filename = f'sources/names_{file_suffix}.csv'
         df.to_csv(filename, index=False)
 
+    return df
+
+
+def load_or_fetch_laureates(file_path, url):
+    if os.path.exists(file_path):
+        print('Loading cached laureates data')
+        df = pd.read_csv(file_path)
+    else:
+        df = get_all_laureates(url)
+        df.to_csv(file_path, index=False)
     return df
