@@ -15,7 +15,7 @@
             "male"
         ]
     },
-    "award_year": {
+    "year": {
         "original_name": "nobelPrizes_1.awardYear",
         "dtype": "int64"
     },
