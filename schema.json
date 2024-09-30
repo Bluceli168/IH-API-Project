@@ -1,0 +1,32 @@
+{
+    "id": {
+        "original_name": "id",
+        "dtype": "int64"
+    },
+    "name": {
+        "original_name": "knownName.en",
+        "dtype": "object"
+    },
+    "gender": {
+        "original_name": "gender",
+        "dtype": "category",
+        "categories": [
+            "female",
+            "male"
+        ]
+    },
+    "year": {
+        "original_name": "nobelPrizes_1.awardYear",
+        "dtype": "int64"
+    },
+    "field": {
+        "original_name": "nobelPrizes_1.category.en",
+        "dtype": "category",
+        "categories": [
+            "Physics",
+            "Chemistry",
+            "Physiology or Medicine",
+            "Economic Sciences"
+        ]
+    }
+}
